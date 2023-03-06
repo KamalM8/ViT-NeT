@@ -25,6 +25,8 @@ from utils import get_rank, get_world_size
 from torch.utils.data import Dataset
 from torchvision.datasets.utils import download_url, list_dir
 
+from datasets import load_dataset
+
 try:
     from torchvision.transforms import InterpolationMode
 
@@ -150,6 +152,50 @@ class CarsDataset(Dataset):
     def map_class(self, id):
         id = np.ravel(id)
         ret = self.car_names[id - 1][0][0]
+        return ret
+
+    def show_batch(self, img_batch, class_batch):
+
+        for i in range(img_batch.shape[0]):
+            ax = plt.subplot(1, img_batch.shape[0], i + 1)
+            title_str = self.map_class(int(class_batch[i]))
+            img = np.transpose(img_batch[i, ...], (1, 2, 0))
+            ax.imshow(img)
+            ax.set_title(title_str.__str__(), {'fontsize': 5})
+            plt.tight_layout()
+
+class AIORNOT(Dataset):
+
+    def __init__(self, ds, transform=None):
+        """
+        Args:
+            mat_anno (string): Path to the MATLAB annotation file.
+            data_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+
+        self.full_data_set = ds
+        self.classes = {0: 'natural', 1: 'ai'}
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.full_data_set)
+
+    def __getitem__(self, idx):
+        image = self.full_data_set[idx]['image']
+        img_class = self.full_data_set[idx]['label']
+
+        if self.transform:
+            image = self.transform(image)
+
+        # return image, car_class, img_name
+        return image, img_class
+
+    def map_class(self, id):
+        id = np.ravel(id)
+        ret = self.classes[id]
         return ret
 
     def show_batch(self, img_batch, class_batch):
@@ -547,6 +593,28 @@ def build_dataset(is_train, config):
                            transform=test_transform,
                            download=False
                            )
+        nb_classes = len(dataset.classes)
+    elif config.DATA.DATASET == 'aiornot':
+        prj = 600 if config.DATA.IMG_SIZE > 224 else 300
+        ds = load_dataset('competitions/aiornot')
+        if is_train:
+            dataset = AIORNOT(ds['train'],
+                              transform=transforms.Compose([
+                                  transforms.Resize((prj, prj), Image.BILINEAR),
+                                  transforms.RandomCrop((config.DATA.IMG_SIZE, config.DATA.IMG_SIZE)),
+                                  transforms.RandomHorizontalFlip(),
+                                  AutoAugImageNetPolicy(),
+                                  transforms.ToTensor(),
+                                  transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+                              )
+        else:
+            dataset = AIORNOT(ds['test'],
+                              transform=transforms.Compose([
+                                  transforms.Resize((prj, prj), Image.BILINEAR),
+                                  transforms.CenterCrop((config.DATA.IMG_SIZE, config.DATA.IMG_SIZE)),
+                                  transforms.ToTensor(),
+                                  transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+                              )
         nb_classes = len(dataset.classes)
     else:
         raise NotImplementedError("We only support ImageNet Now.")
