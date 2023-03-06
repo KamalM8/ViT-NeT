@@ -596,9 +596,10 @@ def build_dataset(is_train, config):
         nb_classes = len(dataset.classes)
     elif config.DATA.DATASET == 'aiornot':
         prj = 600 if config.DATA.IMG_SIZE > 224 else 300
-        ds = load_dataset('competitions/aiornot')
+        ds_train = load_dataset('competitions/aiornot', split='train[:80%]')
+        ds_val = load_dataset('competitions/aiornot', split='train[80%:]')
         if is_train:
-            dataset = AIORNOT(ds['train'],
+            dataset = AIORNOT(ds_train,
                               transform=transforms.Compose([
                                   transforms.Resize((prj, prj), Image.BILINEAR),
                                   transforms.RandomCrop((config.DATA.IMG_SIZE, config.DATA.IMG_SIZE)),
@@ -608,7 +609,7 @@ def build_dataset(is_train, config):
                                   transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
                               )
         else:
-            dataset = AIORNOT(ds['test'],
+            dataset = AIORNOT(ds_val,
                               transform=transforms.Compose([
                                   transforms.Resize((prj, prj), Image.BILINEAR),
                                   transforms.CenterCrop((config.DATA.IMG_SIZE, config.DATA.IMG_SIZE)),
